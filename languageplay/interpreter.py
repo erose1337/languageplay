@@ -9,7 +9,9 @@ class Interpreter(object):
         if builtins is None:
             builtins = {"handle_define" : self.handle_define, "handle_def" : self.handle_def,                      
                         "handle_ " : self.handle_space, "handle_\n" : self.handle_newline,
-                        "handle_print" : self.handle_print, "handle_+" : "handle_plus"}                      
+                        "handle_print" : self.handle_print, 
+                        "handle_=" : self.handle_equals, "handle_+" : self.handle_plus,
+                        "__stack__" : []}                      
         self.builtins = builtins             
         self.preprocess_table = {}
         
@@ -18,18 +20,11 @@ class Interpreter(object):
         
     def execute(self, program, context=None):        
         context = context if context is not None else self.builtins.copy()
-        program = program[:]
-        context["__stack__"] = stack = []        
-        while program:
-            token = program[0]                                            
-            print "Executing: ", token
-            try:
-                handler = context["handle_{}".format(token)]
-            except KeyError:                
-                self.invalid_token(program, context)
-            del program[0]            
-            handler(program, context)            
-                
+        program = program[:]               
+        self.evaluate(program, context)
+        if context["__stack__"]: 
+            raise ValueError("Stack not empty when program finished: {}".format(context["__stack__"]))
+            
     def handle_define(self, program, context):
         # define token expression        
         assert program[0] == ' '
@@ -79,19 +74,86 @@ class Interpreter(object):
         assert program[0] == ' '
         del program[0]        
         end_of_string = parsing.parse_for_block(program)        
-        assert end_of_string is not None, program
-        _text = program[:end_of_string]
-         
+        if end_of_string is None:
+            _text = program[0]
+            del program[0]
+        else:
+            _text = program[:end_of_string]         
+            del program[:end_of_string]
         try:
             _text = self.preprocess_table[_text]
         except KeyError:            
             pass
-        print _text    
-        del program[:end_of_string]
+        if _text in context:
+            _text = context[_text]
+        print _text            
         
     def handle_plus(self, program, context):
-        print "Plussing: ", program
+        assert program[0] == ' '
+        del program[0]        
+        last_name = context["__stack__"].pop(-1)
+        last_name_value = context[last_name] if parsing.is_word(last_name) else last_name
+        next_name_value = self.resolve_next_value(program, context)               
+        context["__stack__"].append(last_name_value + next_name_value)
+            
+    def resolve_next_value(self, program, context):
+        end_of_block = parsing.parse_for_block(program)
+        if end_of_block is None:
+            next_name = program[0]
+            print "Next item is a single item: ", next_name
+            del program[0]
+            try:
+                next_name = self.preprocess_table[next_name]
+            except KeyError:
+                pass            
+            if parsing.is_word(next_name):
+                next_name_value = context[next_name]
+            else:
+                next_name_value = next_name            
+        else:
+            block = program[1:end_of_block - 1]
+            del program[:end_of_block]
+            _context = context.copy()
+            print "Evaluating block: ", block
+            self.evaluate(block, _context)                    
+            next_name_value = _context["__stack__"].pop(-1)
+        return next_name_value
         
+    def handle_equals(self, program, context):                
+        assert program[0] == ' '
+        del program[0]        
+        name = context["__stack__"].pop(-1)        
+        value = self.resolve_next_value(program, context)
+        #end_of_block = parsing.parse_for_block(program)
+        #if end_of_block is None:
+        #    value = program[0]
+        #    del program[0]
+        #else:
+        #    _program = program[:end_of_block][1:-1]
+        #    del program[:end_of_block]
+        #    _context = context.copy()
+        #    self.evaluate(_program, _context)
+        #    value = _context["__stack__"].pop(-1)
+            
+        print "Assigning", name, value, context["__stack__"]
+        context[name] = value
+        
+    def evaluate(self, program, context):
+        while program:
+            token = program[0]                   
+            if token in self.preprocess_table:
+                token = self.preprocess_table[token]
+            try:
+                handler = context["handle_{}".format(token)]
+            except KeyError:                      
+                print "Storing name: ", token
+                context["__stack__"].append(token)
+                del program[0]
+                #self.invalid_token(program, context)
+            else:                
+                del program[0]            
+                print "Handling: ", token            
+                handler(program, context)          
         
     def invalid_token(self, program, context):
         print("Exception" + ('*' * (79 - len("Exception"))))
@@ -110,15 +172,20 @@ class Interpreter(object):
         program = interpreter.compile(test_input)  
         interpreter.execute(program)
         
-        test_input = "define takeitfurther \'Ok now I am REALLY happy! :D\'\nprint takeitfurther {oh}"
+        test_input = "define takeitfurther \'Ok now I am REALLY happy! :D\'\nprint takeitfurther"
         program = interpreter.compile(test_input)        
         interpreter.execute(program)
         
         #test_input = "define item_count 10 for item in range(item_count){print item}"
         #program = interpreter.compile(test_input)        
         #interpreter.execute(program)
+                
+        test_input = "test_value = 1\ntest_value = {test_value + test_value}"
+        program = interpreter.compile(test_input)
+        interpreter.execute(program)
         
-        test_input = "define item_a 10\ndefine item_b 20\ndefine item_a {item_a + item_b}\nprint item_a"
+        print "\nNext program"
+        test_input = "define item_a 10\ndefine item_b 20\ntest_value = {item_a + {item_b + item_b}}\nprint test_value"
         program = interpreter.compile(test_input)
         interpreter.execute(program)
         
