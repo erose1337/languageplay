@@ -1,0 +1,4 @@
+- add ability to utilize expressions as arguments to function call
+- add arbitrary # of positional arguments
+- add support for arbitrary binary operations
+   - generalize plus/add

@@ -5,6 +5,7 @@ NUMBER_SYMBOLS = ''.join(str(item) for item in range(10))
 TOKEN_SYMBOLS = string.ascii_letters + NUMBER_SYMBOLS + '_'
 BLOCK_INDICATORS = {'{' : '}', '[' : ']', '(' : ')',
                     "'" : "'", '"' : '"', """'''""" : """'''""", '''"""''' : '''"""''',}                    
+STRING_INDICATORS = ["'", '"', "'''", '"""']
 
 def parse_string(_bytes):    
     program = []
