@@ -1,7 +1,7 @@
 # language defined by grammer, not words
 
-NUMBER_SYMBOLS = bytearray(range(48, 58))
-TOKEN_SYMBOLS = bytearray(range(65, 123)) + NUMBER_SYMBOLS + '_'
+NUMBER_SYMBOLS = bytes(bytearray(range(48, 58)))
+TOKEN_SYMBOLS = bytes(bytearray(range(65, 123))) + NUMBER_SYMBOLS + '_'
 BLOCK_INDICATORS = {'{' : '}', '[' : ']', '(' : ')',
                     "'" : "'", '"' : '"', """'''""" : """'''""", '''"""''' : '''"""''',}                    
 STRING_INDICATORS = ["'", '"', "'''", '"""']
