@@ -1,6 +1,8 @@
 import pprint
 import string
 
+# language defined by grammer, not words
+
 NUMBER_SYMBOLS = ''.join(str(item) for item in range(10))
 TOKEN_SYMBOLS = string.ascii_letters + NUMBER_SYMBOLS + '_'
 BLOCK_INDICATORS = {'{' : '}', '[' : ']', '(' : ')',
@@ -37,14 +39,19 @@ def parse_for_block(program, block_indicators=BLOCK_INDICATORS):
             raise ValueError("Block is missing a closing delimiter {}".format(''.join(program[:index + 2])))
                                    
 def is_integer(_bytes, _set=set(NUMBER_SYMBOLS)):
-    return _set.union(_bytes) == _set
+    try:
+        return _set.union(_bytes) == _set
+    except TypeError:
+        return False
     
 def is_word(_bytes, _set=set(TOKEN_SYMBOLS), _set2=set(NUMBER_SYMBOLS)):
     # determine whether or not _bytes is a word like "def" or "variable_name1", or something like ";" or " "  or '10234'   
-    if not len(_set.union(_bytes)) > len(_set) and not is_integer(_bytes):
-        return True
-    else:
-        return False
+    try:
+        if not len(_set.union(_bytes)) > len(_set) and not is_integer(_bytes):
+            return True
+    except TypeError:
+        pass
+    return False
                           
 def test_parse_string():    
     test_input = "def test_function(arguments){for item in range(10){print item}}"
