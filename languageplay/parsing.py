@@ -1,10 +1,7 @@
-import pprint
-import string
-
 # language defined by grammer, not words
 
-NUMBER_SYMBOLS = ''.join(str(item) for item in range(10))
-TOKEN_SYMBOLS = string.ascii_letters + NUMBER_SYMBOLS + '_'
+NUMBER_SYMBOLS = bytearray(range(48, 58))
+TOKEN_SYMBOLS = bytearray(range(65, 123)) + NUMBER_SYMBOLS + '_'
 BLOCK_INDICATORS = {'{' : '}', '[' : ']', '(' : ')',
                     "'" : "'", '"' : '"', """'''""" : """'''""", '''"""''' : '''"""''',}                    
 STRING_INDICATORS = ["'", '"', "'''", '"""']
@@ -27,7 +24,7 @@ def parse_string(_bytes):
 def parse_for_block(program, block_indicators=BLOCK_INDICATORS):    
     end_of_block = []    
     if program[0] in block_indicators:                    # if the current symbol opens a block
-        end_of_block.append(block_indicators[program[0]]) # then store the corresponding end block token       
+        end_of_block.append(block_indicators[program[0]]) # then store the corresponding end block token and search for it in the program
         for index, piece in enumerate(program[1:]):             
             if piece == end_of_block[-1]:       
                 del end_of_block[-1]
@@ -40,10 +37,12 @@ def parse_for_block(program, block_indicators=BLOCK_INDICATORS):
                                    
 def is_integer(_bytes, _set=set(NUMBER_SYMBOLS)):
     try:
-        return _set.union(_bytes) == _set
-    except TypeError:
+        value = int(_bytes)
+    except (TypeError, ValueError):
         return False
-    
+    else:
+        return True
+        
 def is_word(_bytes, _set=set(TOKEN_SYMBOLS), _set2=set(NUMBER_SYMBOLS)):
     # determine whether or not _bytes is a word like "def" or "variable_name1", or something like ";" or " "  or '10234'   
     try:
