@@ -2,4 +2,4 @@
    - generalize plus/add
 - add iteration   
 
-    
+if symbol is an operator    

@@ -278,7 +278,7 @@ class Interpreter(object):
                             "call wow 1 2\n" + 
                             " 1  ",
                             
-                            "foreign python \"import pride; __stack__.append(pride)\""
+                            "foreign python \"import this; __stack__.append('python was here')\""
                             ):
                            
                             #"define item_count 10\n" +
