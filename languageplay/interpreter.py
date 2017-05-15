@@ -41,7 +41,7 @@ class Interpreter(object):
             return None
         
     def resolve_next_value(self, program, context):
-        next_name = self.parse_next_value(program, context)
+        next_name = self.parse_next_value(program)
         
         if len(next_name) == 1:          
             next_name_value = self.resolve_name(next_name[0], context)           
@@ -56,7 +56,7 @@ class Interpreter(object):
                      
         return next_name_value
         
-    def parse_next_value(self, program, context):
+    def parse_next_value(self, program):
         while program[0] in self.ignore_tokens:
             del program[0]
         
@@ -99,23 +99,20 @@ class Interpreter(object):
                             
     def handle_define(self, program, context):          
         token = self.resolve_next_value(program, context)               
-        value = self.parse_next_value(program, context)
+        value = self.parse_next_value(program)
         self.preprocess_table[token] = ''.join(value)
         #print "Defined: ", token, ''.join(value)
         
     def handle_def(self, program, context):        
-        function_name = self.parse_next_value(program, context)
-        arguments = self.parse_next_value(program, context)        
+        function_name = self.parse_next_value(program)
+        arguments = self.parse_next_value(program)        
         arguments = [item for item in arguments if parsing.is_word(item)]
-        body = self.parse_next_value(program, context)
+        body = self.parse_next_value(program)
         
         context[''.join(function_name)] = (arguments, body)       
         
-    def handle_call(self, program, context):
-        assert program[0] == ' '
-        del program[0]
-        function_name = program.pop(0)
-                
+    def handle_call(self, program, context):                        
+        function_name = ''.join(self.parse_next_value(program))
         try:
             arguments, body = context[function_name]
         except KeyError:
@@ -143,9 +140,7 @@ class Interpreter(object):
     def handle_print(self, program, context):                           
         print self.resolve_next_value(program, context)        
                 
-    def handle_plus(self, program, context):        
-        del program[0]        
-        
+    def handle_plus(self, program, context):                        
         try:
             last_name = context["__stack__"].pop(-1)                
         except IndexError:
@@ -159,15 +154,12 @@ class Interpreter(object):
             value = last_name_value + next_name_value
         context["__stack__"].append(value)
                     
-    def handle_equals(self, program, context):                        
-        del program[0]        
+    def handle_equals(self, program, context):                                
         name = context["__stack__"].pop(-1)        
         value = self.resolve_next_value(program, context)        
         context[name] = value                 
         
-    def handle_binary_operator(self, program, context):
-        assert program[0] == ' '
-        del program[0]
+    def handle_binary_operator(self, program, context):        
         left_hand_operand = context["__stack__"].pop(-1)
         right_hand_operand = self.resolve_next_value(program, context)
         
