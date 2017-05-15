@@ -63,9 +63,13 @@ Each space separates a program. Some programs print something, other programs ul
 "call wow 1 2\n" + 
 " 1  ", # returns 1
 
-"foreign python \"import this; __stack__.append('python was here')\"" # returns 'python was here'!```
+"foreign python \"import this; __stack__.append('python was here')\"" # returns 'python was here'!
+```
 
 
-Why?
+
+
+
+ Why?
 ----
 Fun.
