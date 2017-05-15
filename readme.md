@@ -13,7 +13,8 @@ A computer programming language that currently supports the following:
     - currently only supports python
     
 The syntax is very flexible and customizable.
-The only example (or even existing) code is for the Interpreter unit test:
+The only example (or even existing) code is for the Interpreter unit test. Consequently it was written more to stress edge cases then read well.
+Each space separates a program. Some programs print something, other programs ultimately return a value:
 
 ```
 "define takeitfurther \'Ok now I am REALLY happy! :D\'\n" + 
@@ -45,7 +46,7 @@ The only example (or even existing) code is for the Interpreter unit test:
 "variable1\n=\n{1 + 5}\n" +
 "implicit_reference",
 
-"x = 10 y = 20 z = {x + y} print (z) z",
+"x = 10 y = 20 z = {x + y} print (z) z", # print z and then return z
 
 "x = 0\n" + 
 "y = 0\n" + 
@@ -60,9 +61,9 @@ The only example (or even existing) code is for the Interpreter unit test:
 "print 'good happy success'\n  " +
 "def wow(x y){print {x + y}}\n" + 
 "call wow 1 2\n" + 
-" 1  ",
+" 1  ", # returns 1
 
-"foreign python \"import this; __stack__.append('python was here')\""```
+"foreign python \"import this; __stack__.append('python was here')\""``` # returns 'python was here'!
 
 
 Why?
