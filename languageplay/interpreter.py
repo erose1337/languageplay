@@ -8,7 +8,7 @@ class Interpreter(object):
         if builtins is None:
             builtins = {"define" : self.handle_define, "def" : self.handle_def,                      
                         " " : self.handle_space, '\n' : self.handle_newline,
-                        "print" : self.handle_print, "call" : self.handle_call,
+                        "print" : self.handle_print, "call" : self.handle_call,                        
                         "=" : self.handle_equals, "+" : self.handle_plus,
                         "__stack__" : []}                      
         self.builtins = builtins             
@@ -28,7 +28,7 @@ class Interpreter(object):
     def evaluate(self, program, context):
         while program:                                    
             token = self.resolve_next_value(program, context)                                                      
-            #print "Handling: ", token
+#            print "Handling: ", token
             if token in self.builtins.values():            
                 token(program, context)             
             else:
@@ -42,17 +42,17 @@ class Interpreter(object):
         end_of_block = parsing.parse_for_block(program)
         if end_of_block is None:
             next_name = program[0]
-    #        print "Next item is a single item: ", next_name
+         #   print "Next item is a single item: ", next_name
             del program[0]
             next_name_value = self.resolve_name(next_name, context)            
         else:                       
             if program[0] not in parsing.STRING_INDICATORS:                       
                 block = program[1:end_of_block - 1]            
                 del program[:end_of_block] 
-     #           print "Next item is a block: ", block    
+       #         print "Next item is a block: ", block    
                 next_name_value = self.resolve_block(block, context)
             else:
-     #           print "Next item is a string: ", program[:end_of_block]
+       #         print "Next item is a string: ", program[:end_of_block]
                 next_name_value = ''.join(program[:end_of_block])
                 del program[:end_of_block]
         
@@ -70,17 +70,17 @@ class Interpreter(object):
                 # if a block was defined, then evaluate the block now                
                 block = self.compile(next_name)                             
                 if next_name[0] not in parsing.STRING_INDICATORS:                                                            
-                    next_name = self.resolve_block(block, context)                                                                   
+                    next_name = self.resolve_block(block, context)             
             try:
                 next_name_value = context[next_name]
             except KeyError:
-                next_name_value = next_name 
+                next_name_value = next_name             
             return next_name_value
 
     def resolve_block(self, block, context):
         _context = context.copy()  
         return self.evaluate(block, _context)                            
-                    
+                            
     def handle_define(self, program, context):
         # define token expression        
         assert program[0] == ' '
@@ -128,101 +128,117 @@ class Interpreter(object):
         del program[0]
         function_name = program.pop(0)
         
-        #print "Calling: ", function_name
+        
         try:
             arguments, body = context[function_name]
         except KeyError:
             raise NameError("{} not found".format(function_name))
-        _arguments = dict()        
-        #print "Setting arguments: ", arguments, program
-        preprocess_table = self.preprocess_table
-        backup = preprocess_table.copy()
-        for argument in arguments:            
-         #   assert program[0] == ' ', program
+        
+        preprocess_table = self.preprocess_table        
+        backup = []
+        prune = []        
+        for argument in arguments:                     
             del program[0]                   
-            preprocess_table[argument] = self.resolve_next_value(program, context)
-            #print("Set argument {} : {}".format(argument, preprocess_table[argument]))
+            if argument in preprocess_table:
+                backup.append((argument, preprocess_table[argument]))
+            else:
+                prune.append(argument)
+            preprocess_table[argument] = self.resolve_next_value(program, context)            
             
         _context = context.copy()                
         value = self.evaluate(body, _context)        
         
+        for item, _backup in backup:
+            preprocess_table[item] = _backup
+        for item in prune:
+            del preprocess_table[item]
+            
     def handle_space(self, program, context):
         pass
         
     def handle_newline(self, program, context):
         pass
         
-    def handle_print(self, program, context):   
-        assert program[0] == ' '
-        del program[0]                
+    def handle_print(self, program, context):           
+        del program[0]                        
         print self.resolve_next_value(program, context)        
                 
     def handle_plus(self, program, context):
         assert program[0] == ' '
         del program[0]        
-        #print program
+        
         try:
             last_name = context["__stack__"].pop(-1)                
         except IndexError:
             raise SyntaxError("Unable to load left hand operand for '+' operation ({})".format(program[:8]))
             
-        #print "Determining value of: ", last_name
-        last_name_value = self.resolve_name(last_name, context)        
-        #print "Retrieving next block for addend: ", program
-        next_name_value = self.resolve_next_value(program, context)               
-        #print "Plussing: ", last_name_value, next_name_value, type(last_name_value), type(next_name_value)        
-        context["__stack__"].append(last_name_value + next_name_value)
+        
+        last_name_value = self.resolve_name(last_name, context)                
+        next_name_value = self.resolve_next_value(program, context)                       
+        try:
+            value = last_name_value[:-1] + next_name_value[1:]
+        except TypeError:
+            value = last_name_value + next_name_value
+        context["__stack__"].append(value)
                     
-    def handle_equals(self, program, context):                
-        assert program[0] == ' '
+    def handle_equals(self, program, context):                        
         del program[0]        
         name = context["__stack__"].pop(-1)        
-        value = self.resolve_next_value(program, context)
-        #print "Assigning", name, value, type(value), context["__stack__"]
+        value = self.resolve_next_value(program, context)        
         context[name] = value                 
         
-    def handle_unrecognized_token(self, token, program, context):
-        #print "Storing: ", token
+    def handle_binary_operator(self, program, context):
+        assert program[0] == ' '
+        del program[0]
+        left_hand_operand = context["__stack__"].pop(-1)
+        right_hand_operand = self.resolve_next_value(program, context)
+        
+    def handle_unrecognized_token(self, token, program, context):        
         context["__stack__"].append(token)
              
     @classmethod
     def unit_test(cls):
         interpreter = cls()
         
-        for test_source in ("define takeitfurther \'Ok now I am REALLY happy! :D\'\n" + 
-                            "print takeitfurther",
-                            
-                            "test_value1 = 1\n" + 
-                            "test_value2 = {test_value1 + test_value1}\n" +
-                            "print test_value2",
-                            
-                            "define item_a {10 + 1 + 2}\n" + 
-                            "item_b = 20\n" + 
-                            "test_value = {item_a + {item_b + item_b + item_b}}\n" + 
-                            "print test_value",
-                            
-                            "print {\'testing \' + \'testing further\'}",
-                            
+        for test_source in (#"define takeitfurther \'Ok now I am REALLY happy! :D\'\n" + 
+                            #"print takeitfurther",
+                            #
+                            #"test_value1 = 1\n" + 
+                            #"test_value2 = {test_value1 + test_value1}\n" +
+                            #"print test_value2",
+                            #
+                            #"define item_a {10 + 1 + 2}\n" + 
+                            #"item_b = 20\n" + 
+                            #"test_value = {item_a + {item_b + item_b + item_b}}\n" + 
+                            #"print test_value",
+                            #
+                            #"print {\'testing \' + \'testing further\'}",
+                            #
                             "def test_function(thing1 thing2){print {thing1 + thing2}}\n" + 
                             "call test_function 'I love you so much ' ':D!'\n" +
                             "print 'and you even more ;)'",
+                            #
+                            #"define test_value '10'\n" + 
+                            #"test_string = {test_value + 'test1 ' + 'test2 ' + {'test3 ' + 'test4 ' + 'test5 '}}\n" +
+                            #"print test_string",
                             
-                            "define test_value '10'\n" + 
-                            "test_string = {test_value + 'test1 ' + 'test2 ' + {'test3 ' + 'test4 ' + 'test5 '}}\n" +
-                            "print test_string",
+                            #"define implicit_reference {variable1 + variable2}\n" +
+                            #"variable1\n=\n1\n" +
+                            #"variable2\n=\n2\n" +
+                            #"print\nimplicit_reference\n" +
+                            #"variable1\n=\n{1 + 5}\n" +
+                            #"implicit_reference",
                             
-                            "define implicit_reference {variable1 + variable2}\n" +
-                            "variable1 = 1 variable2 = 2\n" +
-                            "print implicit_reference\n" +
-                            "variable1 = {1 + 5}\n" +
-                            "implicit_reference",
+                            #"x = 10 y = 20 z = {x + y} print (z)",
                             ):
                            
-                            #"define item_count 10 for item in range(item_count){print 'item'}"):        
-            print "\nNext program" 
+                            #"define item_count 10\n" +
+                            #"for item in range(item_count){print 'item'}"):        
+            print "\nNext program" + ('-' * (79 - len("\nNext program")))
             print '*' * 79
             print test_source
             print
+            print '*' * 79
             program = interpreter.compile(test_source)
             print "Executing..."
             print

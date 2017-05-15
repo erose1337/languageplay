@@ -1,3 +1,16 @@
-- add arbitrary # of positional arguments
+- fix quotes when concatenating strings
+    - "fixed" for now; May require modification if additional data types are introduced
 - add support for arbitrary binary operations
    - generalize plus/add
+   
+   
+if (something_is_True){
+    do_stuff}
+else
+
+
+if -> resolve next token
+    if it is True, then resolve next block
+    if it is False, then delete next block
+    
+    if else

@@ -1,7 +1,8 @@
 # language defined by grammer, not words
 
 NUMBER_SYMBOLS = bytes(bytearray(range(48, 58)))
-TOKEN_SYMBOLS = bytes(bytearray(range(65, 123))) + NUMBER_SYMBOLS + '_'
+TOKEN_SYMBOLS = bytes(bytearray(range(65, 91))) + bytes(bytearray(range(97, 97 + 26))) + NUMBER_SYMBOLS + '_'
+OPERATOR_SYMBOLS = bytes(bytearray(range(48))) + bytes(bytearray(range(58, 65))) + bytes(bytearray(range(91, 97))) + bytes(bytearray(range(123, 256)))
 BLOCK_INDICATORS = {'{' : '}', '[' : ']', '(' : ')',
                     "'" : "'", '"' : '"', """'''""" : """'''""", '''"""''' : '''"""''',}                    
 STRING_INDICATORS = ["'", '"', "'''", '"""']
@@ -51,7 +52,13 @@ def is_word(_bytes, _set=set(TOKEN_SYMBOLS), _set2=set(NUMBER_SYMBOLS)):
     except TypeError:
         pass
     return False
-                          
+                         
+def is_operator(_bytes, _set=set(OPERATOR_SYMBOLS)):
+    if not set(_bytes).difference(_set):
+        return True
+    else:
+        return False
+                            
 def test_parse_string():    
     test_input = "def test_function(arguments){for item in range(10){print item}}"
     parse_string(test_input)
