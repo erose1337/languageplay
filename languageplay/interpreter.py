@@ -6,9 +6,10 @@ class Interpreter(object):
     
     def __init__(self, builtins=None, preprocess_table=None, ignore_tokens=(' ', '\n')):
         if builtins is None:
-            builtins = {"define" : self.handle_define, "def" : self.handle_def,                                              
+            builtins = {"define" : self.handle_define, "def" : self.handle_def,                                             
                         "print" : self.handle_print, "call" : self.handle_call,                        
                         "=" : self.handle_equals, "+" : self.handle_plus,
+                        "if" : self.handle_if,
                         "__stack__" : []}                      
         self.builtins = builtins             
         self.preprocess_table = {} if preprocess_table is None else preprocess_table
@@ -29,11 +30,13 @@ class Interpreter(object):
         
     def evaluate(self, program, context):
         while program:                                    
-            token = self.resolve_next_value(program, context)                                                      
-#            print "Handling: ", token
+            #print "Resolving: ", program
+            token = self.resolve_next_value(program, context)    
+            if token is None:
+                break
             if token in self.builtins.values():            
                 token(program, context)             
-            else:
+            else:                
                 self.handle_unrecognized_token(token, program, context)
         try:
             return context["__stack__"].pop(-1)
@@ -42,7 +45,9 @@ class Interpreter(object):
         
     def resolve_next_value(self, program, context):
         next_name = self.parse_next_value(program)
-        
+        if next_name is None:
+            return None
+            
         if len(next_name) == 1:          
             next_name_value = self.resolve_name(next_name[0], context)           
         elif next_name[0] not in parsing.STRING_INDICATORS:
@@ -56,10 +61,13 @@ class Interpreter(object):
                      
         return next_name_value
         
-    def parse_next_value(self, program):
-        while program[0] in self.ignore_tokens:
-            del program[0]
-        
+    def parse_next_value(self, program):        
+        try:
+            while program[0] in self.ignore_tokens:
+                del program[0]
+        except IndexError:
+            return None
+            
         end_of_block = parsing.parse_for_block(program)
         if end_of_block is None:
             next_name = [program[0]]         
@@ -96,7 +104,45 @@ class Interpreter(object):
     def resolve_block(self, block, context):
         _context = context.copy()  
         return self.evaluate(block, _context)                            
-                            
+                    
+    def handle_if(self, program, context):
+        true_or_false = self.resolve_next_value(program, context)
+        if true_or_false == True:
+            
+            result = self.resolve_next_value(program, context)
+            if result is not None:
+                context["__stack__"].append(result)
+            
+            if program:
+                _else = self.parse_next_value(program)
+             #   print "Clearing out elifs/else statements: ", _else, program
+                while _else[0] == "elif":          
+                    _conditional = self.parse_next_value(program)
+                  #  print "Cleared conditional: ", _conditional
+                    _block = self.parse_next_value(program)
+               #     print "Cleared block: ", _block
+                    if program:
+                        _else = self.parse_next_value(program)
+                    else:
+                        return
+                        
+            #        print "Encountered next potential else: ", _else
+            #    print "Clearing out last statement: ", _else
+                if _else[0] == "else":
+                    _block = self.parse_next_value(program)
+                else:                    
+                    program.insert(0, _else[0])
+        else:
+            _previous_block = self.parse_next_value(program)
+            #print "Checking for else clause: ", true_or_false, program
+            _else = self.parse_next_value(program)   
+            if _else[0] == "elif":
+                result = self.handle_if(program, context)                
+            elif _else[0] == "else":
+                #print "Resolving else clause: ", program
+                result = self.resolve_next_value(program, context)
+                context["__stack__"].append(result)                    
+    
     def handle_define(self, program, context):          
         token = self.resolve_next_value(program, context)               
         value = self.parse_next_value(program)
@@ -199,7 +245,22 @@ class Interpreter(object):
                             "variable1\n=\n{1 + 5}\n" +
                             "implicit_reference",
                             
-                            "x = 10 y = 20 z = {x + y} print (z)",
+                            "x = 10 y = 20 z = {x + y} print (z) z",
+                            
+                            "x = 0\n" + 
+                            "y = 0\n" + 
+                            "if (x){\n" +
+                            "    print 'x is True!'}\n" +
+                            "elif (y){\n" +
+                            "    print 'y is True!'}\n" +
+                            "elif (0){}\n" + 
+                            "elif (1){print '1 is 1!'}\n" + 
+                            "else{\n" + 
+                            "    print 'x and y are False!'}\n" +
+                            "print 'good happy success'\n  " +
+                            "  1  "
+                            
+                            
                             ):
                            
                             #"define item_count 10\n" +
