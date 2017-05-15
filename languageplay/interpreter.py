@@ -6,8 +6,9 @@ class Interpreter(object):
     
     def __init__(self, builtins=None, preprocess_table=None, ignore_tokens=(' ', '\n')):
         if builtins is None:
-            builtins = {"define" : self.handle_define, "def" : self.handle_def,                                             
-                        "print" : self.handle_print, "call" : self.handle_call,                        
+            builtins = {"define" : self.handle_define, "def" : self.handle_def,
+                        "foreign" : self.handle_foreign,
+                        "print" : self.handle_print, "call" : self.handle_call,                          
                         "=" : self.handle_equals, "+" : self.handle_plus,
                         "if" : self.handle_if,
                         "__stack__" : []}                      
@@ -29,16 +30,17 @@ class Interpreter(object):
         return output
         
     def evaluate(self, program, context):
+        _builtins = self.builtins.values()
         while program:                                    
             #print "Resolving: ", program
             token = self.resolve_next_value(program, context)    
             if token is None:
                 break
-            if token in self.builtins.values():            
+            if token in _builtins:            
                 token(program, context)             
             else:                
                 self.handle_unrecognized_token(token, program, context)
-        try:
+        try:            
             return context["__stack__"].pop(-1)
         except IndexError:
             return None
@@ -91,10 +93,14 @@ class Interpreter(object):
         except KeyError:
             pass    
         else:
-            # if a block was defined, then evaluate the block now                
-            block = self.compile(next_name)                             
-            if next_name[0] not in parsing.STRING_INDICATORS:                                                            
-                next_name = self.resolve_block(block, context)             
+            # if a block was defined, then evaluate the block now   
+            try:
+                block = self.compile(next_name)                             
+            except TypeError:
+                pass
+            else:
+                if next_name[0] not in parsing.STRING_INDICATORS:                                                            
+                    next_name = self.resolve_block(block, context)             
         try:
             next_name_value = context[next_name]
         except KeyError:
@@ -115,46 +121,54 @@ class Interpreter(object):
             
             if program:
                 _else = self.parse_next_value(program)
-             #   print "Clearing out elifs/else statements: ", _else, program
+             
                 while _else[0] == "elif":          
-                    _conditional = self.parse_next_value(program)
-                  #  print "Cleared conditional: ", _conditional
+                    _conditional = self.parse_next_value(program)             
                     _block = self.parse_next_value(program)
-               #     print "Cleared block: ", _block
+               
                     if program:
                         _else = self.parse_next_value(program)
                     else:
                         return
-                        
-            #        print "Encountered next potential else: ", _else
-            #    print "Clearing out last statement: ", _else
+                                    
                 if _else[0] == "else":
                     _block = self.parse_next_value(program)
                 else:                    
-                    program.insert(0, _else[0])
+                    program[:] = _else + program
         else:
             _previous_block = self.parse_next_value(program)
-            #print "Checking for else clause: ", true_or_false, program
+            
             _else = self.parse_next_value(program)   
             if _else[0] == "elif":
                 result = self.handle_if(program, context)                
-            elif _else[0] == "else":
-                #print "Resolving else clause: ", program
+            elif _else[0] == "else":            
                 result = self.resolve_next_value(program, context)
-                context["__stack__"].append(result)                    
-    
+                if result is not None:
+                    context["__stack__"].append(result)                    
+            else:
+                program[:] = _else + program
+   
+    def handle_foreign(self, program, context):
+        language = self.resolve_next_value(program, context)        
+        if language.lower() == "python":
+            python_source = self.resolve_next_value(program, context)[1:-1]  
+            print "Compiling python source: ", python_source
+            python_code = compile(python_source, "foreign_function_interface", "exec")
+            _context = context.copy()
+            exec(python_code, _context, _context)            
+        else:
+            raise NotImplementedError("Foreign language '{}' not implemented".format(language))
+        
     def handle_define(self, program, context):          
         token = self.resolve_next_value(program, context)               
         value = self.parse_next_value(program)
         self.preprocess_table[token] = ''.join(value)
-        #print "Defined: ", token, ''.join(value)
-        
+                
     def handle_def(self, program, context):        
         function_name = self.parse_next_value(program)
         arguments = self.parse_next_value(program)        
         arguments = [item for item in arguments if parsing.is_word(item)]
-        body = self.parse_next_value(program)
-        
+        body = self.parse_next_value(program)       
         context[''.join(function_name)] = (arguments, body)       
         
     def handle_call(self, program, context):                        
@@ -205,9 +219,11 @@ class Interpreter(object):
         value = self.resolve_next_value(program, context)        
         context[name] = value                 
         
-    def handle_binary_operator(self, program, context):        
+    def handle_operator(self, operator, program, context):        
         left_hand_operand = context["__stack__"].pop(-1)
         right_hand_operand = self.resolve_next_value(program, context)
+        result = getattr(left_hand_operand, "__{}__".format(self.operator_name[operator]))(right_hand_operand)
+        context["__stack__"].append(result)
         
     def handle_unrecognized_token(self, token, program, context):        
         context["__stack__"].append(token)
@@ -258,9 +274,11 @@ class Interpreter(object):
                             "else{\n" + 
                             "    print 'x and y are False!'}\n" +
                             "print 'good happy success'\n  " +
-                            "  1  "
+                            "def wow(x y){print {x + y}}\n" + 
+                            "call wow 1 2\n" + 
+                            " 1  ",
                             
-                            
+                            "foreign python \"import pride; __stack__.append(pride)\""
                             ):
                            
                             #"define item_count 10\n" +
