@@ -40,7 +40,7 @@ class Interpreter(object):
         while program:                                                
             name = parsing.parse_next_value(program)      
             token = self.resolve_next_value(name, context)    
-      
+#            print "Evaling: ", name, token
             if token is None:
                 break
             if token in _builtins:                  
@@ -78,15 +78,15 @@ class Interpreter(object):
             next_name = context["__preprocessor__"][next_name]
         except KeyError:
             pass    
-        else:
+        else:                
             try:
                 block = self.compile(next_name)                             
             except TypeError:
                 pass
             else:                        
-                if block[0] not in parsing.STRING_INDICATORS:
-                    block = block[1:-1]                
-                    next_name = self.resolve_block(block, context)  
+                if len(block) > 1 and block[0] not in parsing.STRING_INDICATORS:
+                    block = block[1:-1]                                   
+                    next_name = self.resolve_block(block, context)    
         try:            
             next_name_value = context[next_name]            
         except KeyError:
@@ -145,14 +145,15 @@ class Interpreter(object):
         while names:
             _names.append(parsing.parse_next_value(names)[0])
         names = _names        
-        print "Loop variables: ", names
+        
         _in = parsing.parse_next_value(program)
         if _in[0] != "in":
             raise SyntaxError("Expected '{}'".format("in"))
                 
-        next_item = parsing.parse_next_value(program)
-        
-        iterator = iter(self.resolve_next_value(next_item, context))        
+        next_item = self.resolve_next_value(parsing.parse_next_value(program), context)
+        assert next_item[0] in parsing.BLOCK_INDICATORS, next_item
+        #print "Generating iterator: ", next_item, list(self.resolve_next_value(next_item, context))
+        iterator = iter(next_item[1:-1])
         loop_body = parsing.parse_next_value(program)    
         running = True        
         while running:
@@ -161,14 +162,13 @@ class Interpreter(object):
             except StopIteration:
                 running = False
                 break
-            else:
+            else:                
                 if len(names) > 1:                
-                    for index, name in enumerate(names):
-                        print name, next_item[index]
+                    for index, name in enumerate(names):                        
                         context[name] = next_item[index]  
-                else:
-                    assert names
+                else:                    
                     context[names[0]] = next_item
+            #print "Applying loop body with: ", loop_body#names, context[names[0]]
             self.resolve_block(loop_body[:], context)
         
     def handle_foreign(self, program, context):   
@@ -203,7 +203,7 @@ class Interpreter(object):
             raise NameError("{} not found".format(function_name))
         except TypeError:
             raise TypeError("{} is not callable".format(function_name))
-            
+        
         preprocess_table = context["__preprocessor__"]
         backup = []
         prune = []        
@@ -215,9 +215,9 @@ class Interpreter(object):
                 prune.append(argument)
             next_token = parsing.parse_next_value(program)
             preprocess_table[argument] = self.resolve_next_value(next_token, context)            
-            
-        _context = context.copy()            
-        value = self.evaluate(body, _context)        
+        
+        _context = context.copy()                    
+        value = self.evaluate(body[:], _context)        
         
         for item, _backup in backup:
             preprocess_table[item] = _backup
@@ -325,7 +325,9 @@ class Interpreter(object):
                             "foreign python \"\nimport this\nprint dir()\n__stack__.append((None, 'python was here'))\"",
                             
                             "test_string = 'test string!'\n" +
-                            "for (symbol) in test_string {print (symbol + ' ' + wow)}",
+                            "def test_function(test_symbol)(print (test_symbol + ' yay!'))\n" +            
+                            "call test_function 'function test'\n" +
+                            "for (symbol) in test_string (call test_function symbol)",
                             ):
                                                        
             print "\nNext program" + ('-' * (79 - len("\nNext program")))

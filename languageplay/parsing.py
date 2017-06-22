@@ -33,7 +33,7 @@ def parse_for_block(program, block_indicators=BLOCK_INDICATORS):
             elif piece in block_indicators:       
                 end_of_block.append(block_indicators[piece])                              
         else:      
-            raise ValueError("Block is missing a closing delimiter {}".format(''.join(program[:index + 2])))
+            raise SyntaxError("Block is missing a closing delimiter {}".format(''.join(program[:index + 2])))
          
 def parse_next_value(program, ignore_tokens=IGNORE_TOKENS, string_indicators=STRING_INDICATORS):        
     try:
