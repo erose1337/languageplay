@@ -1,5 +1,52 @@
 - add support for arbitrary binary operations
    - generalize plus/add
 - add iteration   
+- C foreign function interface
+    - compile with gcc as shared object
+    - get handle to function via ctypes (utilize python exec if necessary)
+    - run function and collect result
 
-if symbol is an operator    
+    
+for name in iterator {expression}
+
+def handle_for(self, program, context):
+    name = self.parse_next_value(program)
+    in = self.parse_next_value(program)
+    if in[0] != "in":
+        raise SyntaxError("Invalid syntax (missing 'in')")
+    
+    iterator = self.resolve_next_value(program, context)
+    for _value in iterator:
+        preprocess_table[name] = _value
+        
+    preprocess_table = self.preprocess_table
+    backup = []
+    prune = []
+    for name in names:
+        
+        
+resolve next value -> obtains next value, evaluating all expressions to do so; any evaluating expressions are consumed
+parse next value   -> obtains code for next value; consumes item from program stack, but does not evaluate it
+insert code        -> inserts code into program
+
+
+
+
+
+
+# name = name
+# name = value
+# value = value
+
+push name
+handle =:
+    right_value = resolve next value
+    left_name = pop
+    left_value = resolve name left_name
+
+
+
+push (name, value) pairs to stack
+utilize name or value as appropriate when popping from stack
+
+

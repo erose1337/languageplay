@@ -1,114 +1,134 @@
 import parsing
-
-class InvalidToken(Exception): pass
    
 class Interpreter(object):    
     
-    def __init__(self, builtins=None, preprocess_table=None, ignore_tokens=(' ', '\n')):
+    def __init__(self, builtins=None, preprocess_table=None):
         if builtins is None:
             builtins = {"define" : self.handle_define, "def" : self.handle_def,
-                        "foreign" : self.handle_foreign,
+                        "foreign" : self.handle_foreign, "for" : self.handle_for,
+                        
                         "print" : self.handle_print, "call" : self.handle_call,                          
                         "=" : self.handle_equals, "+" : self.handle_plus,
-                        "if" : self.handle_if,
+                        "if" : self.handle_if, ";" : lambda program, context: None,
                         "__stack__" : []}                      
-        self.builtins = builtins             
-        self.preprocess_table = {} if preprocess_table is None else preprocess_table
-        self.ignore_tokens = ignore_tokens
-        
+        self.builtins = builtins                     
+                        
     def compile(self, source):
         return parsing.parse_string(source)
         
-    def execute(self, program, context=None):        
+    def execute(self, program, context=None, stack=None, preprocessor=None):        
         context = context if context is not None else self.builtins.copy()
+        context["__stack__"] = stack if stack is not None else []
+        context["__preprocessor__"] = preprocessor if preprocessor is not None else dict()
         program = program[:]               
         output = self.evaluate(program, context)
-        if parsing.is_word(output) and output not in context:
-            raise NameError("{} not found".format(output))
+        #if output in context["__preprocessor__"]:
+        #    block = self.compile(context["__preprocessor__"][output])
+        #    output = self.resolve_block(block[1:-1], context)
+        
+        if parsing.is_word(output):
+            try:
+                output = context[output]
+            except KeyError:
+                raise NameError("{} not found".format(output))
+            
         if context["__stack__"]: 
-            raise ValueError("Stack not empty when program finished: {}".format(context["__stack__"]))
+            raise ValueError("Stack not empty when program finished: {}".format(context["__stack__"]))        
         return output
         
     def evaluate(self, program, context):
         _builtins = self.builtins.values()
-        while program:                                    
-            #print "Resolving: ", program
-            token = self.resolve_next_value(program, context)    
+        _program = program[:]
+        #print "Evaling: ", _program
+        while program:                                                
+            name = parsing.parse_next_value(program)
+          #  print "Resolving: ", name
+            token = self.resolve_next_value(name, context)    
+          #  print "Token value: ", token
             if token is None:
                 break
             if token in _builtins:            
+         #       print "Handling builtin: ", token
                 token(program, context)             
             else:                
-                self.handle_unrecognized_token(token, program, context)
-        try:            
-            return context["__stack__"].pop(-1)
+                #print "Unrecognized token: ", name, token                
+                self.handle_unrecognized_token((''.join(name), token), program, context)
+        try:                      
+        #    print "Eval finished; Dumping stack: ", _program, context["__stack__"]
+            return context["__stack__"].pop(-1)[1]
         except IndexError:
             return None
         
-    def resolve_next_value(self, program, context):
-        next_name = self.parse_next_value(program)
-        if next_name is None:
-            return None
+    def resolve_next_value(self, next_name, context):               
+        if next_name is None or not next_name:
+            return None        
+        #print "Resolving next value: ", next_name
+        if len(next_name) == 1:     
+         #   print "Resolving single value...", next_name
+            next_name_value = self.resolve_name(next_name[0], context) 
+         #   print "Resolved single value: ", next_name_value
+        else:
+            if next_name[0] in parsing.STRING_INDICATORS:
+          #      print "Resolving string: ", next_name          
+                next_token = ''.join(parsing.parse_next_value(next_name))
+         #       print "Resolving a string...", next_token
+                next_name_value = self.resolve_name(next_token, context)#''.join(next_token[1:-1])
+         #       print "Resolved string: ", next_name_value
+                #next_name_value = self.resolve_next_value(next_token, context)
+                if next_name:
+         #           print "Storing string to resolve rest of block: ", next_name
+                    context["__stack__"].append((next_token, next_name_value))
             
-        if len(next_name) == 1:          
-            next_name_value = self.resolve_name(next_name[0], context)           
-        elif next_name[0] not in parsing.STRING_INDICATORS:
-            assert next_name           
-            next_name_value = self.resolve_block(next_name, context)
-        else:           
-            next_name_value = ''.join(next_name)
+            if next_name:                
+         #       print "Resolving block: ", next_name
+                next_name_value = self.resolve_block(next_name[1:-1], context)            
             
+                
+            #else:       
+            #    _next_name = parsing.parse_next_value(next_name)                
+            #    print "Resolving string: ", _next_name, next_name
+            #    next_name_value = ''.join(_next_name)
+        #print next_name_value, next_name_value in context#, context.keys()
         if parsing.is_integer(next_name_value):
             next_name_value = int(next_name_value)
-                     
+        #elif next_name_value in context:
+        #    next_name_value = context[next_name_value]
+        #print "Finished resolving: ", next_name_value
         return next_name_value
-        
-    def parse_next_value(self, program):        
+                
+    def resolve_name(self, next_name, context):                           
+        #print "Resolving name:... ", next_name
         try:
-            while program[0] in self.ignore_tokens:
-                del program[0]
-        except IndexError:
-            return None
-            
-        end_of_block = parsing.parse_for_block(program)
-        if end_of_block is None:
-            next_name = [program[0]]         
-            del program[0]            
-        else:            
-            while program[0] in self.ignore_tokens:
-                del program[0]
-          
-            if program[0] not in parsing.STRING_INDICATORS:                       
-                next_name = program[1:end_of_block - 1]            
-                del program[:end_of_block] 
-                          
-            else:            
-                next_name = program[:end_of_block]
-                del program[:end_of_block]
-        return next_name
-        
-    def resolve_name(self, next_name, context):                   
-        try:
-            next_name = self.preprocess_table[next_name]
+            next_name = context["__preprocessor__"][next_name]
         except KeyError:
             pass    
         else:
+        #    print "Preprocessed name: ", next_name
             # if a block was defined, then evaluate the block now   
-            try:
-                block = self.compile(next_name)                             
-            except TypeError:
-                pass
-            else:
-                if next_name[0] not in parsing.STRING_INDICATORS:                                                            
-                    next_name = self.resolve_block(block, context)             
-        try:
-            next_name_value = context[next_name]
+           # try:
+            block = self.compile(next_name)                             
+        #    except TypeError:
+         #       pass
+         #   else:
+            #if next_name[0] not in parsing.STRING_INDICATORS:
+            
+            if block[0] not in parsing.STRING_INDICATORS:
+                #print "resolve_name Resolving block: ", block[1:-1], next_name
+                #assert block[0] in parsing.BLOCK_INDICATORS
+                block = block[1:-1]
+            
+                next_name = self.resolve_block(block, context)  
+                #print "Finished resolving block: ", next_name
+        #print "...Resolving:... ", next_name
+        try:            
+            next_name_value = context[next_name]            
         except KeyError:
             next_name_value = next_name             
+        #print "Resolved name: ", next_name, next_name_value
         return next_name_value
 
     def resolve_block(self, block, context):
-        _context = context.copy()  
+        _context = context.copy()          
         return self.evaluate(block, _context)                            
                     
     def handle_if(self, program, context):
@@ -117,38 +137,66 @@ class Interpreter(object):
             
             result = self.resolve_next_value(program, context)
             if result is not None:
-                context["__stack__"].append(result)
+                context["__stack__"].append((None, result))
             
             if program:
-                _else = self.parse_next_value(program)
+                _else = parsing.parse_next_value(program)
              
                 while _else[0] == "elif":          
-                    _conditional = self.parse_next_value(program)             
-                    _block = self.parse_next_value(program)
+                    _conditional = parsing.parse_next_value(program)             
+                    _block = parsing.parse_next_value(program)
                
                     if program:
-                        _else = self.parse_next_value(program)
+                        _else = parsing.parse_next_value(program)
                     else:
                         return
                                     
                 if _else[0] == "else":
-                    _block = self.parse_next_value(program)
+                    _block = parsing.parse_next_value(program)
                 else:                    
                     program[:] = _else + program
         else:
-            _previous_block = self.parse_next_value(program)
+            _previous_block = parsing.parse_next_value(program)
             
-            _else = self.parse_next_value(program)   
+            _else = parsing.parse_next_value(program)   
             if _else[0] == "elif":
                 result = self.handle_if(program, context)                
             elif _else[0] == "else":            
                 result = self.resolve_next_value(program, context)
                 if result is not None:
-                    context["__stack__"].append(result)                    
+                    context["__stack__"].append((None, result))
             else:
                 program[:] = _else + program
    
+    def handle_for(self, program, context):
+        names = parsing.parse_next_value(program)
+        _names = []
+        while names:
+            _names.append(parsing.parse_next_value(names)[0])
+        names[:] = _names
+        
+        _in = parsing.parse_next_value(program)
+        if _in[0] != "in":
+            raise SyntaxError("Expected '{}'".format("in"))
+                
+        iterator = iter(self.resolve_next_value(program, context))        
+        loop_body = parsing.parse_next_value(program)    
+        running = True        
+        while running:
+            for name in names:
+                try:
+                    context[name] = next(iterator)
+                except StopIteration:                    
+                    running = False
+                    break                            
+            else:        
+                self.resolve_block(loop_body[:], context)
+        
     def handle_foreign(self, program, context):
+    #def foreign(program context){language = resolve_next_value
+    #                             if (language == "python"){
+    #                               python_source = resolve_next_value
+    #                               python_code = 
         language = self.resolve_next_value(program, context)        
         if language.lower() == "python":
             python_source = self.resolve_next_value(program, context)[1:-1]  
@@ -160,25 +208,35 @@ class Interpreter(object):
             raise NotImplementedError("Foreign language '{}' not implemented".format(language))
         
     def handle_define(self, program, context):          
-        token = self.resolve_next_value(program, context)               
-        value = self.parse_next_value(program)
-        self.preprocess_table[token] = ''.join(value)
-                
+        #token = self.resolve_next_value(program, context)               
+        name_token = parsing.parse_next_value(program)
+        function_name = self.resolve_next_value(name_token, context)
+        
+        body_token = parsing.parse_next_value(program)
+        #body_value = self.resolve_next_value(body_token, context)
+        #print "Defining: ", function_name, ''.join(body_token)        
+        #token = parsing.parse_next_value(program)        
+        #print "defining: ", token, value
+        context["__preprocessor__"][function_name] = ''.join(body_token)#''.join(body_token)
+        
+        
     def handle_def(self, program, context):        
-        function_name = self.parse_next_value(program)
-        arguments = self.parse_next_value(program)        
+        function_name = parsing.parse_next_value(program)
+        arguments = parsing.parse_next_value(program)        
         arguments = [item for item in arguments if parsing.is_word(item)]
-        body = self.parse_next_value(program)       
+        body = parsing.parse_next_value(program)       
         context[''.join(function_name)] = (arguments, body)       
         
     def handle_call(self, program, context):                        
-        function_name = ''.join(self.parse_next_value(program))
+        function_name = ''.join(parsing.parse_next_value(program))
         try:
             arguments, body = context[function_name]
         except KeyError:
             raise NameError("{} not found".format(function_name))
-        
-        preprocess_table = self.preprocess_table        
+        except TypeError:
+            raise TypeError("{} is not callable".format(function_name))
+            
+        preprocess_table = context["__preprocessor__"]
         backup = []
         prune = []        
         for argument in arguments:                     
@@ -187,7 +245,8 @@ class Interpreter(object):
                 backup.append((argument, preprocess_table[argument]))
             else:
                 prune.append(argument)
-            preprocess_table[argument] = self.resolve_next_value(program, context)            
+            next_token = parsing.parse_next_value(program)
+            preprocess_table[argument] = self.resolve_next_value(next_token, context)            
             
         _context = context.copy()                
         value = self.evaluate(body, _context)        
@@ -197,42 +256,87 @@ class Interpreter(object):
         for item in prune:
             del preprocess_table[item]
                     
-    def handle_print(self, program, context):                           
-        print self.resolve_next_value(program, context)        
+    def handle_print(self, program, context):          
+        #print "Getting item to be printed: ", program
+        #next_value = self.resolve_next_value(program, context)        
+        #print next_value
+        next_token = parsing.parse_next_value(program)        
+        #print "Got item: ", next_token
+        print self.resolve_next_value(next_token, context)        
                 
-    def handle_plus(self, program, context):                        
+    def handle_plus(self, program, context):    
+        #print "Plussing: ", program, context["__stack__"]
         try:
-            last_name = context["__stack__"].pop(-1)                
+            last_name_value = context["__stack__"].pop(-1)[1]              
         except IndexError:
-            raise SyntaxError("Unable to load left hand operand for '+' operation ({})".format(program[:8]))
+            raise SyntaxError("Unable to load left hand operand for '+' operation ({}) ({})".format(program[:8], context["__stack__"]))
+       # else:            
+            #if last_name_value in context:
+           # print "Resolving left operand: ", last_name_value
+           # last_name_value = self.resolve_next_value([last_name_value], context)
+            #try:
+            #    last_name_value = context[last_name_value]
+            #except KeyError:
+            #    try:
+            #        last_name_value = context["__preprocessor__"][last_name_value]
+            #    except KeyError:
+            #        pass
                 
-        last_name_value = self.resolve_name(last_name, context)                
-        next_name_value = self.resolve_next_value(program, context)                       
+        next_name = parsing.parse_next_value(program)
+        next_name_value = self.resolve_next_value(next_name, context)                       
+        
         try:
-            value = last_name_value[:-1] + next_name_value[1:]
-        except TypeError:
-            value = last_name_value + next_name_value
-        context["__stack__"].append(value)
-                    
+            if last_name_value[0] in parsing.STRING_INDICATORS:
+                value = last_name_value[:-1] + next_name_value[1:]
+            else:                                   
+                value = last_name_value + next_name_value     
+        except (IndexError, TypeError):
+        #    print "Plussing: ", last_name_value, next_name_value
+            value = last_name_value + next_name_value     
+        
+        #    assert last_name_value[-1] in parsing.STRING_INDICATORS
+        #    assert next_name_value[0] in parsing.STRING_INDICATORS
+        #    assert next_name_value[-1] in parsing.STRING_INDICATORS
+        #    value = last_name_value[:-1] + next_name_value[1:]
+        #else:
+            value = last_name_value + next_name_value     
+            
+        context["__stack__"].append((None, value))
+        
     def handle_equals(self, program, context):                                
-        name = context["__stack__"].pop(-1)        
-        value = self.resolve_next_value(program, context)        
+        name = context["__stack__"].pop(-1)[0]     
+        #print "Assigning: ", name, program
+        next_token = parsing.parse_next_value(program)
+        #print "Assigning token: ", next_token
+        value = self.resolve_next_value(next_token, context) 
+        #print "Assigning value: ", value
         context[name] = value                 
+        #print "Assigned: ", name, value
         
     def handle_operator(self, operator, program, context):        
-        left_hand_operand = context["__stack__"].pop(-1)
+        left_hand_operand = context["__stack__"].pop(-1)[1]
         right_hand_operand = self.resolve_next_value(program, context)
         result = getattr(left_hand_operand, "__{}__".format(self.operator_name[operator]))(right_hand_operand)
-        context["__stack__"].append(result)
+        context["__stack__"].append((None, result))
         
     def handle_unrecognized_token(self, token, program, context):        
+        #print "Pushing value to stack: ", token
         context["__stack__"].append(token)
              
     @classmethod
     def unit_test(cls):
         interpreter = cls()
         
-        for test_source in ("define takeitfurther \'Ok now I am REALLY happy! :D\'\n" + 
+        for test_source in ("x = 1; print x",
+                            "x = {1 + 1}; print x",
+                            "x = '1 + 1'; print x",
+                            "x = 1\n y = {x + x}\n print y",
+                            
+                            "define preprocessortest 'ohh ok so...'\nprint preprocessortest",
+                            "define preprocessortest {'one fish ' + 'two fish ' + 'red fish ' + 'blue fish'}\nprint preprocessortest",
+                            "define preprocessortest 'testing string '\nprint (preprocessortest + preprocessortest + 'a test again')"
+                            
+                            "define takeitfurther \'Ok now I am REALLY happy! :D\'\n" + 
                             "print takeitfurther",
                             
                             "test_value1 = 1\n" + 
@@ -255,10 +359,10 @@ class Interpreter(object):
                             "print test_string",
                             
                             "define implicit_reference {variable1 + variable2}\n" +
-                            "variable1\n=\n1\n" +
-                            "variable2\n=\n2\n" +
-                            "print\nimplicit_reference\n" +
-                            "variable1\n=\n{1 + 5}\n" +
+                            "variable1 = 1\n" +
+                            "variable2 = 2\n" +
+                            "print implicit_reference\n" +
+                            "variable1 = {1 + 5}\n" +
                             "implicit_reference",
                             
                             "x = 10 y = 20 z = {x + y} print (z) z",
@@ -277,24 +381,27 @@ class Interpreter(object):
                             "def wow(x y){print {x + y}}\n" + 
                             "call wow 1 2\n" + 
                             " 1  ",
-                            
-                            "foreign python \"import this; __stack__.append('python was here')\""
+                            #
+                            #"foreign python \"\nimport this\nprint dir()\n__stack__.append('python was here')\"",
+                            #
+                            #"test_string = \'test string!\'\n" +
+                            #"for (symbol name) in test_string {print (symbol + name)}",
                             ):
                            
                             #"define item_count 10\n" +
                             #"for item in range(item_count){print 'item'}"):        
             print "\nNext program" + ('-' * (79 - len("\nNext program")))
-            #print '*' * 79
-            #print test_source
-            #print
-            #print '*' * 79            
-            #print "Executing..."
-            #print                            
+            print '*' * 79
+            print test_source
+            print
+            print '*' * 79            
+            print "Executing..."
+            print                            
             program = interpreter.compile(test_source)
             output = interpreter.execute(program)
             if output is not None:
-                print "Obtained output: ", output
-        
+                print "Obtained output: ", output            
+            
 if __name__ == "__main__":
     Interpreter.unit_test()
     
