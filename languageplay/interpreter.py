@@ -137,29 +137,39 @@ class Interpreter(object):
             else:
                 program[:] = _else + program
    
-    def handle_for(self, program, context):
+    def handle_for(self, program, context):        
         names = parsing.parse_next_value(program)
+        if names[0] in parsing.BLOCK_INDICATORS:
+            names = names[1:-1]
         _names = []
         while names:
             _names.append(parsing.parse_next_value(names)[0])
-        names[:] = _names
-        
+        names = _names        
+        print "Loop variables: ", names
         _in = parsing.parse_next_value(program)
         if _in[0] != "in":
             raise SyntaxError("Expected '{}'".format("in"))
                 
-        iterator = iter(self.resolve_next_value(program, context))        
+        next_item = parsing.parse_next_value(program)
+        
+        iterator = iter(self.resolve_next_value(next_item, context))        
         loop_body = parsing.parse_next_value(program)    
         running = True        
         while running:
-            for name in names:
-                try:
-                    context[name] = next(iterator)
-                except StopIteration:                    
-                    running = False
-                    break                            
-            else:        
-                self.resolve_block(loop_body[:], context)
+            try:
+                next_item = next(iterator)
+            except StopIteration:
+                running = False
+                break
+            else:
+                if len(names) > 1:                
+                    for index, name in enumerate(names):
+                        print name, next_item[index]
+                        context[name] = next_item[index]  
+                else:
+                    assert names
+                    context[names[0]] = next_item
+            self.resolve_block(loop_body[:], context)
         
     def handle_foreign(self, program, context):   
         language = ''.join(parsing.parse_next_value(program))        
@@ -314,12 +324,10 @@ class Interpreter(object):
                             
                             "foreign python \"\nimport this\nprint dir()\n__stack__.append((None, 'python was here'))\"",
                             
-                            #"test_string = \'test string!\'\n" +
-                            #"for (symbol name) in test_string {print (symbol + name)}",
+                            "test_string = 'test string!'\n" +
+                            "for (symbol) in test_string {print (symbol + ' ' + wow)}",
                             ):
-                           
-                            #"define item_count 10\n" +
-                            #"for item in range(item_count){print 'item'}"):        
+                                                       
             print "\nNext program" + ('-' * (79 - len("\nNext program")))
             print '*' * 79
             print test_source
