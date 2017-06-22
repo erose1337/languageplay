@@ -13,7 +13,7 @@ class Interpreter(object):
                         "__stack__" : []}                      
         self.builtins = builtins                     
                         
-    def compile(self, source):
+    def compile(self, source):        
         return parsing.parse_string(source)
         
     def execute(self, program, context=None, stack=None, preprocessor=None):        
@@ -42,9 +42,9 @@ class Interpreter(object):
         #print "Evaling: ", _program
         while program:                                                
             name = parsing.parse_next_value(program)
-          #  print "Resolving: ", name
+      #      print "Resolving: ", name
             token = self.resolve_next_value(name, context)    
-          #  print "Token value: ", token
+      #      print "Token value: ", token
             if token is None:
                 break
             if token in _builtins:            
@@ -54,7 +54,7 @@ class Interpreter(object):
                 #print "Unrecognized token: ", name, token                
                 self.handle_unrecognized_token((''.join(name), token), program, context)
         try:                      
-        #    print "Eval finished; Dumping stack: ", _program, context["__stack__"]
+#            print "Eval finished; Dumping stack: ", _program, context["__stack__"]
             return context["__stack__"].pop(-1)[1]
         except IndexError:
             return None
@@ -106,19 +106,20 @@ class Interpreter(object):
         #    print "Preprocessed name: ", next_name
             # if a block was defined, then evaluate the block now   
            # try:
-            block = self.compile(next_name)                             
-        #    except TypeError:
-         #       pass
-         #   else:
-            #if next_name[0] not in parsing.STRING_INDICATORS:
-            
-            if block[0] not in parsing.STRING_INDICATORS:
-                #print "resolve_name Resolving block: ", block[1:-1], next_name
-                #assert block[0] in parsing.BLOCK_INDICATORS
-                block = block[1:-1]
-            
-                next_name = self.resolve_block(block, context)  
-                #print "Finished resolving block: ", next_name
+     #       print "Compiling block: ", next_name
+            try:
+                block = self.compile(next_name)                             
+            except TypeError:
+                pass
+            else:
+                        
+                if block[0] not in parsing.STRING_INDICATORS:
+                    #print "resolve_name Resolving block: ", block[1:-1], next_name
+                    #assert block[0] in parsing.BLOCK_INDICATORS
+                    block = block[1:-1]
+                
+                    next_name = self.resolve_block(block, context)  
+                    #print "Finished resolving block: ", next_name
         #print "...Resolving:... ", next_name
         try:            
             next_name_value = context[next_name]            
@@ -132,10 +133,13 @@ class Interpreter(object):
         return self.evaluate(block, _context)                            
                     
     def handle_if(self, program, context):
-        true_or_false = self.resolve_next_value(program, context)
+        next_item = parsing.parse_next_value(program)
+        true_or_false = self.resolve_next_value(next_item, context)        
+    #    print "Branching: ", next_item, true_or_false
         if true_or_false == True:
             
-            result = self.resolve_next_value(program, context)
+            next_item = parsing.parse_next_value(program)
+            result = self.resolve_next_value(next_item, context)
             if result is not None:
                 context["__stack__"].append((None, result))
             
@@ -161,8 +165,9 @@ class Interpreter(object):
             _else = parsing.parse_next_value(program)   
             if _else[0] == "elif":
                 result = self.handle_if(program, context)                
-            elif _else[0] == "else":            
-                result = self.resolve_next_value(program, context)
+            elif _else[0] == "else":     
+                next_block = parsing.parse_next_value(program)
+                result = self.resolve_next_value(next_block, context)
                 if result is not None:
                     context["__stack__"].append((None, result))
             else:
@@ -196,11 +201,12 @@ class Interpreter(object):
     #def foreign(program context){language = resolve_next_value
     #                             if (language == "python"){
     #                               python_source = resolve_next_value
-    #                               python_code = 
-        language = self.resolve_next_value(program, context)        
+    #                               python_code =     
+        language = ''.join(parsing.parse_next_value(program))
+        #language = self.resolve_next_value(program, context)        
         if language.lower() == "python":
-            python_source = self.resolve_next_value(program, context)[1:-1]  
-            print "Compiling python source: ", python_source
+            python_source = ''.join(parsing.parse_next_value(program))[1:-1]
+            #python_source = self.resolve_next_value(program, context)[1:-1]              
             python_code = compile(python_source, "foreign_function_interface", "exec")
             _context = context.copy()
             exec(python_code, _context, _context)            
@@ -229,6 +235,7 @@ class Interpreter(object):
         
     def handle_call(self, program, context):                        
         function_name = ''.join(parsing.parse_next_value(program))
+        
         try:
             arguments, body = context[function_name]
         except KeyError:
@@ -248,7 +255,7 @@ class Interpreter(object):
             next_token = parsing.parse_next_value(program)
             preprocess_table[argument] = self.resolve_next_value(next_token, context)            
             
-        _context = context.copy()                
+        _context = context.copy()            
         value = self.evaluate(body, _context)        
         
         for item, _backup in backup:
@@ -368,7 +375,7 @@ class Interpreter(object):
                             "x = 10 y = 20 z = {x + y} print (z) z",
                             
                             "x = 0\n" + 
-                            "y = 0\n" + 
+                            "y = 1\n" + 
                             "if (x){\n" +
                             "    print 'x is True!'}\n" +
                             "elif (y){\n" +
@@ -377,13 +384,14 @@ class Interpreter(object):
                             "elif (1){print '1 is 1!'}\n" + 
                             "else{\n" + 
                             "    print 'x and y are False!'}\n" +
-                            "print 'good happy success'\n  " +
-                            "def wow(x y){print {x + y}}\n" + 
-                            "call wow 1 2\n" + 
-                            " 1  ",
-                            #
-                            #"foreign python \"\nimport this\nprint dir()\n__stack__.append('python was here')\"",
-                            #
+                            "print 'good happy success'\n  ",
+                                                       
+                           "def wow(x y){print {x + y}}\n" + 
+                           "call wow 1 2\n" + 
+                           " 1  ",
+                            
+                            "foreign python \"\nimport this\nprint dir()\n__stack__.append((None, 'python was here'))\"",
+                            
                             #"test_string = \'test string!\'\n" +
                             #"for (symbol name) in test_string {print (symbol + name)}",
                             ):
