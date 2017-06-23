@@ -64,7 +64,7 @@ class Interpreter(object):
                 next_name_value = self.resolve_name(next_token, context)                         
                 if next_name:         
                     context["__stack__"].append((next_token, next_name_value))
-            
+                    
             if next_name:                         
                 next_name_value = self.resolve_block(next_name[1:-1], context)            
                             
@@ -152,7 +152,7 @@ class Interpreter(object):
                 
         next_item = self.resolve_next_value(parsing.parse_next_value(program), context)
         assert next_item[0] in parsing.BLOCK_INDICATORS, next_item
-        #print "Generating iterator: ", next_item, list(self.resolve_next_value(next_item, context))
+        
         iterator = iter(next_item[1:-1])
         loop_body = parsing.parse_next_value(program)    
         running = True        
@@ -167,8 +167,7 @@ class Interpreter(object):
                     for index, name in enumerate(names):                        
                         context[name] = next_item[index]  
                 else:                    
-                    context[names[0]] = next_item
-            #print "Applying loop body with: ", loop_body#names, context[names[0]]
+                    context[names[0]] = next_item            
             self.resolve_block(loop_body[:], context)
         
     def handle_foreign(self, program, context):   
@@ -235,15 +234,21 @@ class Interpreter(object):
             raise SyntaxError("Unable to load left hand operand for '+' operation ({}) ({})".format(program[:8], context["__stack__"]))
 
         next_name = parsing.parse_next_value(program)
-        next_name_value = self.resolve_next_value(next_name, context)                       
+        next_name_value = self.resolve_next_value(next_name[:], context)                       
         
         try:
             if last_name_value[0] in parsing.STRING_INDICATORS:
-                value = last_name_value[:-1] + next_name_value[1:]
+                last_name_value = last_name_value[:-1]
+                assert next_name_value[0] in parsing.STRING_INDICATORS
+                next_name_value = next_name_value[1:]
+            elif next_name_value[0] in parsing.STRING_INDICATORS:
+                next_name_value = next_name_value[1:-1]
             else:                                   
                 value = last_name_value + next_name_value     
-        except (IndexError, TypeError):                   
-            value = last_name_value + next_name_value     
+        except (IndexError, TypeError):     
+            pass
+            
+        value = last_name_value + next_name_value     
             
         context["__stack__"].append((None, value))
         
@@ -325,9 +330,10 @@ class Interpreter(object):
                             "foreign python \"\nimport this\nprint dir()\n__stack__.append((None, 'python was here'))\"",
                             
                             "test_string = 'test string!'\n" +
-                            "def test_function(test_symbol)(print (test_symbol + ' yay!'))\n" +            
-                            "call test_function 'function test'\n" +
-                            "for (symbol) in test_string (call test_function symbol)",
+                            "define test_string2 ' positively!'\n" + 
+                            "def test_function(test_symbol)(print (test_symbol + ' oh ' + test_symbol + ' yay!'))\n" +            
+                            "call test_function test_string2\n" 
+                            "for (symbol) in (test_string + test_string2) (call test_function symbol)",
                             ):
                                                        
             print "\nNext program" + ('-' * (79 - len("\nNext program")))
