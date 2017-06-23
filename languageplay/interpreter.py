@@ -40,12 +40,11 @@ class Interpreter(object):
         while program:                                                
             name = parsing.parse_next_value(program)      
             token = self.resolve_next_value(name, context)    
-#            print "Evaling: ", name, token
             if token is None:
-                break
+                continue
             if token in _builtins:                  
                 token(program, context)             
-            else:                                
+            else:                                                
                 self.handle_unrecognized_token((''.join(name), token), program, context)
         try:                      
             return context["__stack__"].pop(-1)[1]
@@ -70,7 +69,7 @@ class Interpreter(object):
                             
         if parsing.is_integer(next_name_value):
             next_name_value = int(next_name_value)
-
+        
         return next_name_value
                 
     def resolve_name(self, next_name, context):                                   
@@ -225,9 +224,11 @@ class Interpreter(object):
                     
     def handle_print(self, program, context):          
         next_token = parsing.parse_next_value(program)                
+        #print "Printing: ", next_token, self.resolve_next_value(next_token, context)
         print self.resolve_next_value(next_token, context)        
                 
-    def handle_plus(self, program, context):            
+    def handle_plus(self, program, context):     
+        #print "Handling plus: ", program
         try:
             last_name_value = context["__stack__"].pop(-1)[1]              
         except IndexError:
@@ -247,8 +248,11 @@ class Interpreter(object):
                 value = last_name_value + next_name_value     
         except (IndexError, TypeError):     
             pass
-            
+        
+        #try:
         value = last_name_value + next_name_value     
+        #except TypeError:
+        #    raise NameError()
             
         context["__stack__"].append((None, value))
         
@@ -333,7 +337,22 @@ class Interpreter(object):
                             "define test_string2 ' positively!'\n" + 
                             "def test_function(test_symbol)(print (test_symbol + ' oh ' + test_symbol + ' yay!'))\n" +            
                             "call test_function test_string2\n" 
-                            "for (symbol) in (test_string + test_string2) (call test_function symbol)",
+                            "for (symbol) in (test_string + test_string2)\n" +
+                            "   (call test_function symbol)",
+                                                                                    
+                            "x = 1;y = 2\n" + 
+                            "block1 = {x = (x + 1); y = (y + 2); y}\n" +
+                            "block2 = {x = (x + 10); y = (x + y); y}\n" +
+                            "define block3 (x = (x + 1); y = (y + 2); y)\n" +
+                            "define block4 (x = (x + 10); y = (x + y); y)\n" +
+                            "print 'individual blocks: '\n" + 
+                            "print block1; print block2;\n" +
+                            "print 'combining blocks...'\n" +                            
+                            "print (block1 + block2)" +
+                            "print 'printing define blocks...'\n" + 
+                            "print block3; print block3;\n" +
+                            "print block4; print block4;\n" +
+                            "print (block3 + block4)"
                             ):
                                                        
             print "\nNext program" + ('-' * (79 - len("\nNext program")))
