@@ -1,0 +1,11 @@
+x = 0
+y = 1 
+if (x){
+    print 'x is True!'}
+elif (y){
+    print 'y is True!'}
+elif (0){}
+elif (1){print '1 is 1!'}
+else{
+    print 'x and y are False!'}
+print 'good happy success'

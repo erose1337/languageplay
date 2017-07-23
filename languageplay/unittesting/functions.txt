@@ -1,0 +1,21 @@
+def test_function(thing1 thing2){
+    print {thing1 + thing2}} 
+
+call test_function 'I love you so much ' ':D!'
+
+print 'and you even more ;)'
+
+def wow(x y){print {x + y}} 
+call wow 1 2
+
+test_string = 'test string!'
+define test_string2 ' positively!'
+def test_function(test_symbol)(
+    print (test_symbol + ' oh ' + test_symbol + ' yay!'))
+
+call test_function test_string2 
+
+for (symbol) in (test_string + test_string2)
+   (call test_function symbol)
+                                                                
+1                                                                

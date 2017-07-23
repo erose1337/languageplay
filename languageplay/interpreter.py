@@ -9,10 +9,14 @@ class Interpreter(object):
                         
                         "print" : self.handle_print, "call" : self.handle_call,                          
                         "=" : self.handle_equals, "+" : self.handle_plus,
-                        "if" : self.handle_if, ";" : lambda program, context: None,
+                        "if" : self.handle_if, ";" : self.handle_semicolon,
                         "__stack__" : []}                      
         self.builtins = builtins                     
-                        
+     
+    def run(self, source, context=None, stack=None, preprocessor=None):
+        program = self.compile(source)
+        return self.execute(program, context, stack, preprocessor)
+        
     def compile(self, source):        
         return parsing.parse_string(source)
         
@@ -181,9 +185,9 @@ class Interpreter(object):
         
     def handle_define(self, program, context):                  
         name_token = parsing.parse_next_value(program)
-        function_name = self.resolve_next_value(name_token, context)        
+      #  function_name = self.resolve_next_value(name_token, context)        
         body_token = parsing.parse_next_value(program)
-        context["__preprocessor__"][function_name] = ''.join(body_token)        
+        context["__preprocessor__"][''.join(name_token)] = ''.join(body_token)        
         
     def handle_def(self, program, context):        
         function_name = parsing.parse_next_value(program)
@@ -223,12 +227,10 @@ class Interpreter(object):
             del preprocess_table[item]
                     
     def handle_print(self, program, context):          
-        next_token = parsing.parse_next_value(program)                
-        #print "Printing: ", next_token, self.resolve_next_value(next_token, context)
+        next_token = parsing.parse_next_value(program)                        
         print self.resolve_next_value(next_token, context)        
                 
-    def handle_plus(self, program, context):     
-        #print "Handling plus: ", program
+    def handle_plus(self, program, context):             
         try:
             last_name_value = context["__stack__"].pop(-1)[1]              
         except IndexError:
@@ -248,12 +250,8 @@ class Interpreter(object):
                 value = last_name_value + next_name_value     
         except (IndexError, TypeError):     
             pass
-        
-        #try:
-        value = last_name_value + next_name_value     
-        #except TypeError:
-        #    raise NameError()
-            
+                
+        value = last_name_value + next_name_value                     
         context["__stack__"].append((None, value))
         
     def handle_equals(self, program, context):                                
@@ -271,90 +269,16 @@ class Interpreter(object):
     def handle_unrecognized_token(self, token, program, context):                
         context["__stack__"].append(token)
              
+    def handle_semicolon(self, program, context):
+        pass
+        
     @classmethod
     def unit_test(cls):
         interpreter = cls()
         
-        for test_source in ("x = 1; print x",
-                            "x = {1 + 1}; print x",
-                            "x = '1 + 1'; print x",
-                            "x = 1\n y = {x + x}\n print y",
-                            
-                            "define preprocessortest 'ohh ok so...'\nprint preprocessortest",
-                            "define preprocessortest {'one fish ' + 'two fish ' + 'red fish ' + 'blue fish'}\nprint preprocessortest",
-                            "define preprocessortest 'testing string '\nprint (preprocessortest + preprocessortest + 'a test again')",
-                            
-                            "define takeitfurther \'Ok now I am REALLY happy! :D\'\n" + 
-                            "print takeitfurther",
-                            
-                            "test_value1 = 1\n" + 
-                            "test_value2 = {test_value1 + test_value1}\n" +
-                            "print test_value2",
-                            
-                            "define item_a {10 + 1 + 2}\n" + 
-                            "item_b = 20\n" + 
-                            "test_value = {item_a + {item_b + item_b + item_b}}\n" + 
-                            "print test_value",
-                            
-                            "print {\'testing \' + \'testing further\'}",
-                            
-                            "def test_function(thing1 thing2){print {thing1 + thing2}}\n" + 
-                            "call test_function 'I love you so much ' ':D!'\n" +
-                            "print 'and you even more ;)'",
-                            
-                            "define test_value '10'\n" + 
-                            "test_string = {test_value + 'test1 ' + 'test2 ' + {'test3 ' + 'test4 ' + 'test5 '}}\n" +
-                            "print test_string",
-                            
-                            "define implicit_reference {variable1 + variable2}\n" +
-                            "variable1 = 1\n" +
-                            "variable2 = 2\n" +
-                            "print implicit_reference\n" +
-                            "variable1 = {1 + 5}\n" +
-                            "implicit_reference",
-                            
-                            "x = 10 y = 20 z = {x + y} print (z) z",
-                            
-                            "x = 0\n" + 
-                            "y = 1\n" + 
-                            "if (x){\n" +
-                            "    print 'x is True!'}\n" +
-                            "elif (y){\n" +
-                            "    print 'y is True!'}\n" +
-                            "elif (0){}\n" + 
-                            "elif (1){print '1 is 1!'}\n" + 
-                            "else{\n" + 
-                            "    print 'x and y are False!'}\n" +
-                            "print 'good happy success'\n  ",
-                                                       
-                           "def wow(x y){print {x + y}}\n" + 
-                           "call wow 1 2\n" + 
-                           " 1  ",
-                            
-                            "foreign python \"\nimport this\nprint dir()\n__stack__.append((None, 'python was here'))\"",
-                            
-                            "test_string = 'test string!'\n" +
-                            "define test_string2 ' positively!'\n" + 
-                            "def test_function(test_symbol)(print (test_symbol + ' oh ' + test_symbol + ' yay!'))\n" +            
-                            "call test_function test_string2\n" 
-                            "for (symbol) in (test_string + test_string2)\n" +
-                            "   (call test_function symbol)",
-                                                                                    
-                            "x = 1;y = 2\n" + 
-                            "block1 = {x = (x + 1); y = (y + 2); y}\n" +
-                            "block2 = {x = (x + 10); y = (x + y); y}\n" +
-                            "define block3 (x = (x + 1); y = (y + 2); y)\n" +
-                            "define block4 (x = (x + 10); y = (x + y); y)\n" +
-                            "print 'individual blocks: '\n" + 
-                            "print block1; print block2;\n" +
-                            "print 'combining blocks...'\n" +                            
-                            "print (block1 + block2)" +
-                            "print 'printing define blocks...'\n" + 
-                            "print block3; print block3;\n" +
-                            "print block4; print block4;\n" +
-                            "print (block3 + block4)"
-                            ):
-                                                       
+        for file_name in ("assignment", "preprocessorprinting", "functions", "foreign", "branching"):  
+            with open("./unittesting/{}.txt".format(file_name), 'r') as _file:
+                test_source = _file.read()
             print "\nNext program" + ('-' * (79 - len("\nNext program")))
             print '*' * 79
             print test_source

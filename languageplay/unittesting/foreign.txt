@@ -1,0 +1,1 @@
+foreign python "import this; print dir(); __stack__.append((None, 'python was here'))"

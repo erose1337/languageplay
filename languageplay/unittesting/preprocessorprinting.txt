@@ -1,0 +1,55 @@
+x = 1; print x
+x = {1 + 1}; print x
+x = '1 + 1'; print x
+x = 1; y = {x + x}
+print y
+
+define preprocessortest 'ohh ok so...'
+print preprocessortest
+
+define preprocessortest {'one fish ' + 'two fish ' + 'red fish ' + 'blue fish'}
+print preprocessortest
+
+define preprocessortest 'testing string '
+print (preprocessortest + preprocessortest + 'a test again')
+
+define takeitfurther 'Ok now I am REALLY happy! :D'
+print takeitfurther
+
+test_value1 = 1
+test_value2 = {test_value1 + test_value1}
+print test_value2
+
+define item_a {10 + 1 + 2}
+item_b = 20
+test_value = {item_a + {item_b + item_b + item_b}}
+print test_value
+
+print {'testing ' + 'testing further'}
+                           
+define test_value '10'
+test_string = {test_value + 'test1 ' + 'test2 ' + {'test3 ' + 'test4 ' + 'test5 '}}
+print test_string
+
+define implicit_reference {variable1 + variable2}
+variable1 = 1
+variable2 = 2
+print implicit_reference
+variable1 = {1 + 5}
+print implicit_reference
+
+x = 10 y = 20 z = {x + y} print (z) z
+
+x = 100; y = 2
+block1 = {x = (x + 1); y = (y + 2); y}
+block2 = {x = (x + 10); y = (x + y); y}
+define block3 (x = (x + 1); y = (y + 2); y)
+define block4 (x = (x + 10); y = (x + y); y)
+print 'individual blocks: '
+print block1; print block2;
+print 'combining blocks...'
+print (block1 + block2)
+print 'printing define blocks...'
+print block3; print block3;
+print block4; print block4;
+print (block3 + block4)                         
